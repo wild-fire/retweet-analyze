@@ -35,12 +35,31 @@ VCR.use_cassette('followers', record: :new_episodes) do
   end
 end
 
+# We create the graph
+g = GraphViz.new( :G, :type => :digraph )
+
+# And a hash with the graph for each retweeter including the original one
+graph_nodes = {}
+(retweets + [retweets.first[:retweeted_status]]).each{|t| graph_nodes[t[:user][:id]] = g.add_nodes t[:user][:screen_name] }
+
 # Now we loop through the retweets and discard the followers that already had retweeted as they couldn't get influenced by further retweets
 pending_retweeters = retweets.map{|t| t[:user][:id]}
 
+# First we add the edges from the original tweeter
+(retweeter_followers[retweets.first[:retweeted_status][:user][:id]] & pending_retweeters).each do |influenced_retweeter|
+  g.add_edges graph_nodes[retweets.first[:retweeted_status][:user][:id]], graph_nodes[influenced_retweeter]
+end
+
+# And then the others
+
 retweets.each do |retweet|
 
+
   influenced_retweeters = retweeter_followers[retweet[:user][:id]] & pending_retweeters
+
+  influenced_retweeters.each do |influenced_retweeter|
+    g.add_edges graph_nodes[retweet[:user][:id]], graph_nodes[influenced_retweeter]
+  end
 
   puts [retweet[:created_at], retweet[:user][:id], retweet[:user][:screen_name], influenced_retweeters.inspect].join("\t")
 
@@ -48,3 +67,4 @@ retweets.each do |retweet|
 
 end
 
+g.output( :png => "retweet_graph.png" )
